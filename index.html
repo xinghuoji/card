@@ -12,7 +12,7 @@
   }
 
   body {
-    background: #f5f5f5;
+    background: #ddd7cb;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -24,7 +24,7 @@
     -webkit-touch-callout: none;
   }
 
-  /* 卡牌区域（严格保持你 58×88 实体比例）*/
+  /* 卡牌区域 */
   #card-box {
     width: 82vw;
     max-width: 380px;
@@ -40,12 +40,14 @@
     display: block;
   }
 
-  /* 抽卡按钮 */
+  /* 抽卡按钮：改成你想要的颜色，这里示例是蓝色 */
   #draw-btn {
     width: 70vw;
     max-width: 320px;
     height: 58px;
-    background: #d92121;
+    /* 按钮背景色 */
+    background: #B36753;
+    /* 按钮按下时的颜色 */
     color: #fff;
     border: none;
     border-radius: 30px;
@@ -56,7 +58,7 @@
   }
 
   #draw-btn:active {
-    background: #b81c1c;
+    background: #F2EDDB;
   }
 </style>
 </head>
@@ -70,12 +72,12 @@
 <button id="draw-btn">点击抽卡</button>
 
 <script>
-  // 👇 这是已经填好你的 GitHub 地址，不用改！
   const prefix = "https://cdn.jsdelivr.net/gh/xinghuoji/card@main/";
   const totalCards = 56;
 
-  // 初始显示第一张
-  showCard(1);
+  // 页面加载时，直接随机一张卡
+  let initialRand = Math.floor(Math.random() * totalCards) + 1;
+  showCard(initialRand);
 
   // 点击抽卡
   document.getElementById("draw-btn").onclick = function() {
