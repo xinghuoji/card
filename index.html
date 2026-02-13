@@ -3,218 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>星火集卡牌</title>
+    <title>卡牌</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-
         body {
             background: #ddd7cb;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
+            text-align: center;
             padding: 20px;
-            font-family: system-ui, -apple-system, sans-serif;
-            touch-action: manipulation;
-            -webkit-tap-highlight-color: transparent;
         }
-
-        #card-box {
-            width: 82vw;
+        #card {
+            width: 90%;
             max-width: 380px;
-            border-radius: 18px;
-            overflow: hidden;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-            margin-bottom: 35px;
-            background: #f2eddb;
-            position: relative;
-        }
-
-        #card-box::before {
-            content: "加载中...";
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #b36753;
-            font-size: 18px;
-            font-weight: bold;
-            z-index: 1;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-
-        #card-box.loading::before {
-            opacity: 1;
-        }
-
-        #card-img {
-            width: 100%;
-            height: auto;
+            margin: 30px auto;
+            border-radius: 16px;
             display: block;
-            position: relative;
-            z-index: 2;
-            opacity: 0;
-            transition: opacity 0.4s ease;
         }
-
-        #card-img.loaded {
-            opacity: 1;
-        }
-
-        #draw-btn {
-            width: 82vw;
-            max-width: 320px;
-            height: 58px;
+        button {
+            width: 80%;
+            max-width: 300px;
+            height: 50px;
             background: #B36753;
-            color: #fff;
+            color: white;
             border: none;
             border-radius: 30px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
-        }
-
-        #draw-btn:active {
-            transform: scale(0.96);
-        }
-
-        #draw-btn:disabled {
-            background: #999;
-            cursor: not-allowed;
-            color: #eee;
-        }
-
-        .tips {
-            margin-top: 15px;
             font-size: 16px;
+            margin-top: 10px;
+        }
+        button:disabled {
+            background: #999;
+        }
+        .tip {
+            margin-top: 10px;
             color: #B36753;
-            font-weight: bold;
-            text-align: center;
-            min-height: 24px;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
-    <div id="card-box">
-        <img id="card-img" src="" alt="卡牌图片">
-    </div>
-    <button id="draw-btn">每日抽卡</button>
-    <div class="tips" id="tips"></div>
 
-    <script>
-        // 配置
-        const prefix = "https://cdn.jsdelivr.net/gh/xinghuoji/card@main/";
-        const totalCards = 15; // 按你实际卡牌数量修改
-        const maxDailyDraws = 3;
+<img id="card">
+<button id="btn">抽卡</button>
+<div class="tip" id="tip"></div>
 
-        // 缓存与状态
-        const cardImageCache = new Map();
-        let isLoading = false;
+<script>
+// 基础配置
+const total = 56;
+const max = 3;
 
-        // 工具：生成图片路径
-        function getCardUrl(num) {
-            const padded = num < 10 ? `0${num}` : `${num}`;
-            return `${prefix}${padded}.jpg`;
-        }
+// 读取今天日期
+let now = new Date().toISOString().split('T')[0];
+let save = JSON.parse(localStorage.getItem('draw')) || { date: now, num: 0 };
 
-        // 预加载并缓存图片
-        function preloadCard(num) {
-            const url = getCardUrl(num);
-            if (cardImageCache.has(url)) {
-                return Promise.resolve(cardImageCache.get(url));
-            }
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.src = url;
-                img.onload = () => {
-                    cardImageCache.set(url, img);
-                    resolve(img);
-                };
-                img.onerror = reject;
-            });
-        }
+// 如果是新的一天，重置次数
+if (save.date !== now) {
+    save = { date: now, num: 0 };
+    localStorage.setItem('draw', JSON.stringify(save));
+}
 
-        // 显示卡牌
-        async function showCard(num) {
-            const cardBox = document.getElementById("card-box");
-            const cardImg = document.getElementById("card-img");
-            const tips = document.getElementById("tips");
+let img = document.getElementById('card');
+let btn = document.getElementById('btn');
+let tip = document.getElementById('tip');
 
-            cardBox.classList.add("loading");
-            cardImg.classList.remove("loaded");
-            isLoading = true;
+// 显示随机卡牌
+function show() {
+    let r = Math.floor(Math.random() * total) + 1;
+    let file = (r < 10 ? '0' : '') + r + '.jpg';
+    img.src = file;
+}
 
-            try {
-                const img = await preloadCard(num);
-                cardImg.src = img.src;
-                cardImg.onload = () => {
-                    cardImg.classList.add("loaded");
-                    cardBox.classList.remove("loading");
-                    isLoading = false;
-                };
-            } catch (err) {
-                tips.textContent = "图片加载失败，请重试";
-                cardBox.classList.remove("loading");
-                isLoading = false;
-            }
-        }
+// 第一次打开就显示
+show();
 
-        // 每日次数限制
-        function getDrawRecord() {
-            const stored = localStorage.getItem("dailyDrawRecord");
-            if (!stored) return { date: null, count: 0 };
-            return JSON.parse(stored);
-        }
+// 按钮状态
+if (save.num >= max) {
+    btn.disabled = true;
+    tip.innerText = '今日已抽3次';
+}
 
-        function setDrawRecord(record) {
-            localStorage.setItem("dailyDrawRecord", JSON.stringify(record));
-        }
-
-        const today = new Date().toISOString().split("T")[0];
-        let drawRecord = getDrawRecord();
-
-        if (drawRecord.date !== today) {
-            drawRecord = { date: today, count: 0 };
-            setDrawRecord(drawRecord);
-        }
-
-        // 初始化按钮状态
-        const drawBtn = document.getElementById("draw-btn");
-        const tips = document.getElementById("tips");
-
-        if (drawRecord.count >= maxDailyDraws) {
-            drawBtn.disabled = true;
-            tips.textContent = "今日次数已用完";
-        }
-
-        // 首次加载一张随机卡
-        const initialNum = Math.floor(Math.random() * totalCards) + 1;
-        showCard(initialNum);
-
-        // 抽卡按钮逻辑（防抖）
-        drawBtn.addEventListener("click", async () => {
-            if (isLoading || drawRecord.count >= maxDailyDraws) return;
-
-            const nextNum = Math.floor(Math.random() * totalCards) + 1;
-            await showCard(nextNum);
-
-            drawRecord.count += 1;
-            setDrawRecord(drawRecord);
-
-            if (drawRecord.count >= maxDailyDraws) {
-                drawBtn.disabled = true;
-                tips.textContent = "今日次数已用完";
-            } else {
-                tips.textContent = "";
-            }
-        });
-    </script>
+// 点击抽卡
+btn.onclick = function () {
+    if (save.num >= max) return;
+    show();
+    save.num++;
+    localStorage.setItem('draw', JSON.stringify(save));
+    if (save.num >= max) {
+        btn.disabled = true;
+        tip.innerText = '今日已抽3次';
+    }
+};
+</script>
 </body>
 </html>
