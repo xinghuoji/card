@@ -19,7 +19,7 @@
             justify-content: center;
             min-height: 100vh;
             padding: 20px;
-            font-family: system-ui, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             touch-action: manipulation;
             -webkit-tap-highlight-color: transparent;
         }
@@ -45,6 +45,12 @@
             font-size: 18px;
             font-weight: bold;
             z-index: 1;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        #card-box.loading::before {
+            opacity: 1;
         }
 
         #card-img {
@@ -54,7 +60,7 @@
             position: relative;
             z-index: 2;
             opacity: 0;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.4s ease;
         }
 
         #card-img.loaded {
@@ -72,11 +78,11 @@
             font-size: 18px;
             font-weight: bold;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.2s, transform 0.1s;
         }
 
         #draw-btn:active {
-            background: #F2EDDB;
+            transform: scale(0.96);
         }
 
         #draw-btn:disabled {
@@ -91,92 +97,124 @@
             color: #B36753;
             font-weight: bold;
             text-align: center;
+            min-height: 24px;
         }
     </style>
 </head>
 <body>
     <div id="card-box">
-        <img id="card-img" src="" onload="this.classList.add('loaded')">
+        <img id="card-img" src="" alt="卡牌图片">
     </div>
     <button id="draw-btn">每日抽卡</button>
     <div class="tips" id="tips"></div>
 
     <script>
+        // 配置
         const prefix = "https://cdn.jsdelivr.net/gh/xinghuoji/card@main/";
-        const totalCards = 56;
+        const totalCards = 15; // 按你实际卡牌数量修改
+        const maxDailyDraws = 3;
 
-        // 图片缓存
+        // 缓存与状态
         const cardImageCache = new Map();
+        let isLoading = false;
+
+        // 工具：生成图片路径
+        function getCardUrl(num) {
+            const padded = num < 10 ? `0${num}` : `${num}`;
+            return `${prefix}${padded}.jpg`;
+        }
 
         // 预加载并缓存图片
         function preloadCard(num) {
-            const file = num < 10 ? "0" + num + ".jpg" : num + ".jpg";
-            const imgUrl = prefix + file;
-
-            if (cardImageCache.has(imgUrl)) {
-                document.getElementById("card-img").src = imgUrl;
-                return;
+            const url = getCardUrl(num);
+            if (cardImageCache.has(url)) {
+                return Promise.resolve(cardImageCache.get(url));
             }
-
-            const img = new Image();
-            img.src = imgUrl;
-            img.onload = function() {
-                cardImageCache.set(imgUrl, img);
-                document.getElementById("card-img").src = imgUrl;
-            };
-            img.onerror = function() {
-                tips.textContent = "图片加载失败，请刷新重试";
-            };
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.src = url;
+                img.onload = () => {
+                    cardImageCache.set(url, img);
+                    resolve(img);
+                };
+                img.onerror = reject;
+            });
         }
 
-        // 每日次数限制逻辑
-        let drawRecord = JSON.parse(localStorage.getItem('dailyDrawRecord')) || {
-            date: new Date().toISOString().split('T')[0],
-            count: 0
-        };
+        // 显示卡牌
+        async function showCard(num) {
+            const cardBox = document.getElementById("card-box");
+            const cardImg = document.getElementById("card-img");
+            const tips = document.getElementById("tips");
 
-        const today = new Date().toISOString().split('T')[0];
+            cardBox.classList.add("loading");
+            cardImg.classList.remove("loaded");
+            isLoading = true;
+
+            try {
+                const img = await preloadCard(num);
+                cardImg.src = img.src;
+                cardImg.onload = () => {
+                    cardImg.classList.add("loaded");
+                    cardBox.classList.remove("loading");
+                    isLoading = false;
+                };
+            } catch (err) {
+                tips.textContent = "图片加载失败，请重试";
+                cardBox.classList.remove("loading");
+                isLoading = false;
+            }
+        }
+
+        // 每日次数限制
+        function getDrawRecord() {
+            const stored = localStorage.getItem("dailyDrawRecord");
+            if (!stored) return { date: null, count: 0 };
+            return JSON.parse(stored);
+        }
+
+        function setDrawRecord(record) {
+            localStorage.setItem("dailyDrawRecord", JSON.stringify(record));
+        }
+
+        const today = new Date().toISOString().split("T")[0];
+        let drawRecord = getDrawRecord();
+
         if (drawRecord.date !== today) {
-            drawRecord = {
-                date: today,
-                count: 0
-            };
-            localStorage.setItem('dailyDrawRecord', JSON.stringify(drawRecord));
+            drawRecord = { date: today, count: 0 };
+            setDrawRecord(drawRecord);
         }
 
+        // 初始化按钮状态
         const drawBtn = document.getElementById("draw-btn");
         const tips = document.getElementById("tips");
 
-        if (drawRecord.count >= 3) {
+        if (drawRecord.count >= maxDailyDraws) {
             drawBtn.disabled = true;
             tips.textContent = "今日次数已用完";
         }
 
-        // 首次加载随机卡牌
-        let initialRand = Math.floor(Math.random() * totalCards) + 1;
-        preloadCard(initialRand);
+        // 首次加载一张随机卡
+        const initialNum = Math.floor(Math.random() * totalCards) + 1;
+        showCard(initialNum);
 
-        // 抽卡逻辑
-        drawBtn.onclick = function() {
-            if (drawRecord.count >= 3) {
-                tips.textContent = "今日次数已用完";
+        // 抽卡按钮逻辑（防抖）
+        drawBtn.addEventListener("click", async () => {
+            if (isLoading || drawRecord.count >= maxDailyDraws) return;
+
+            const nextNum = Math.floor(Math.random() * totalCards) + 1;
+            await showCard(nextNum);
+
+            drawRecord.count += 1;
+            setDrawRecord(drawRecord);
+
+            if (drawRecord.count >= maxDailyDraws) {
                 drawBtn.disabled = true;
-                return;
-            }
-
-            let rand = Math.floor(Math.random() * totalCards) + 1;
-            preloadCard(rand);
-
-            drawRecord.count++;
-            localStorage.setItem('dailyDrawRecord', JSON.stringify(drawRecord));
-
-            if (drawRecord.count === 3) {
                 tips.textContent = "今日次数已用完";
-                drawBtn.disabled = true;
             } else {
                 tips.textContent = "";
             }
-        };
+        });
     </script>
 </body>
 </html>
